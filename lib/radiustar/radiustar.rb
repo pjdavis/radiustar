@@ -1,0 +1,3 @@
+module Radiustar
+
+end
