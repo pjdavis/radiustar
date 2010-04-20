@@ -125,7 +125,7 @@ module Radiustar
           attribute_value.unpack("N")[0]
         end
 
-        set_attribute(attribute.name, attribute_value)
+        set_attribute(attribute.name, attribute_value) if attribute
         attribute_data[0, length] = ""
       end
     end
