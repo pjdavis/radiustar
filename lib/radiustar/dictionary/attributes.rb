@@ -1,6 +1,6 @@
 module Radiustar
 
-  class AttributesCollection
+  class AttributesCollection < Array
 
     def initialize
       @collection = {}
@@ -10,6 +10,7 @@ module Radiustar
     def add(name, id, type)
       @collection[name] ||= Attribute.new(name, id.to_i, type)
       @revcollection[id.to_i] ||= @collection[name]
+      self << @collection[name]
     end
 
     def find_by_name(name)
@@ -23,6 +24,8 @@ module Radiustar
   end
 
   class Attribute
+
+    include Radiustar
 
     attr_reader :name, :id, :type
 
@@ -47,6 +50,10 @@ module Radiustar
 
     def has_values?
       !@values.empty?
+    end
+
+    def values
+      @values
     end
 
   end
