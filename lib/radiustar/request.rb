@@ -4,10 +4,13 @@ module Radiustar
 
   class Request
 
-    def initialize(server, my_ip, dict_file = nil)
+    def initialize(server, my_ip = nil, dict_file = nil)
       @dict = dict_file.nil? ? Dictionary.default : Dictionary.new(dict_file)
-      @my_ip = my_ip
+
       @host, @port = server.split(":")
+      
+      @my_ip = my_ip || get_my_ip(@host)
+
       @port = Socket.getservbyname("radius", "udp") unless @port
       @port = 1812 unless @port
       @port = @port.to_i	# just in case
@@ -60,6 +63,18 @@ module Radiustar
       Packet.new(@dict, Process.pid & 0xff, data[0])
     end
 
+    #looks up the source IP address with a route to the specified destination
+    def get_my_ip(dest_address)
+      orig_reverse_lookup_setting = Socket.do_not_reverse_lookup
+      Socket.do_not_reverse_lookup = true
+
+      UDPSocket.open do |sock|
+        sock.connect dest_address, 1
+        sock.addr.last
+      end
+    ensure
+       Socket.do_not_reverse_lookup = orig_reverse_lookup_setting
+    end
 
   end
 
