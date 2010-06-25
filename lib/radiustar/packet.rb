@@ -112,7 +112,7 @@ module Radiustar
         attribute_type = attribute_type.to_i
 
         attribute = @dict.find_attribute_by_id(attribute_type)
-        attribute_value = case attribute.type
+        attribute_value = case attribute.class
         when 'string'
           attribute_value
         when 'integer'
