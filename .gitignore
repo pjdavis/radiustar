@@ -5,3 +5,4 @@ doc
 pkg
 *.gem
 **/.DS_Store
+nbproject
