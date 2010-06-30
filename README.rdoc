@@ -44,7 +44,7 @@ Ruby Radius Library
 
   require 'radiustar'
 
-	req = Radiustar::Request.new('server', 'my_ip_address')
+	req = Radiustar::Request.new('server')
 	resp = req.authenticate('my_user', 'my_password', 'shared_secret')
 	resp #=> true
 

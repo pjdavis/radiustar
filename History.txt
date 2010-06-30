@@ -1,2 +1,5 @@
+== 0.0.3 / 2010-06-30
+* no longer require to specify your own IP (via bwlang)
+
 == 0.0.1 / 2010-04-14
 * winning at radius
