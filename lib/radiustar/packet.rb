@@ -39,17 +39,17 @@ module Radiustar
     # Generate an authenticator. It will try to use /dev/urandom if
     # possible, or the system rand call if that's not available.
     def gen_authenticator
-      authenticator = []
-      8.times do
-        authenticator << rand(65536)
-      end
-      authenticator.pack("n8")
       if (File.exist?("/dev/urandom"))
         File.open("/dev/urandom") do |urandom|
-          authenticator = urandom.read(16)
+          @authenticator = urandom.read(16)
         end
+      else
+        @authenticator = []
+        8.times do
+          @authenticator << rand(65536)
+        end
+        @authenticator = @authenticator.pack("n8")
       end
-      @authenticator = authenticator
     end
 
     def set_attribute(name, value)
