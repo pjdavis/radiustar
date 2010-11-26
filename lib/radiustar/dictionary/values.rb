@@ -31,7 +31,7 @@ module Radiustar
 
     include Radiustar
 
-    attr_accessor :name
+    attr_accessor :name, :id
 
     def initialize(name, id)
       @name = name
