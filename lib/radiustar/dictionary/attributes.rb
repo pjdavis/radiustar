@@ -4,7 +4,7 @@ module Radiustar
 
     def initialize
       @collection = {}
-      @revcollection = []
+      @revcollection = {}
     end
 
     def add(name, id, type)
@@ -18,7 +18,7 @@ module Radiustar
     end
 
     def find_by_id(id)
-      @revcollection[id.to_i]
+      @revcollection[id]
     end
 
   end
