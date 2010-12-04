@@ -4,38 +4,25 @@ module Radiustar
 
     include Radiustar
 
-    DEFAULT_DICTIONARY_PATH = ::File.join(::File.dirname(__FILE__), '..', '..', 'templates', 'default.txt')
+    DEFAULT_DICTIONARIES_PATH = ::File.join(::File.dirname(__FILE__), '..', '..', 'templates')
 
     def initialize(initial_path = nil)
       @attributes = AttributesCollection.new
       @vendors = VendorCollection.new
 
-      read initial_path if initial_path
+      read_files initial_path if initial_path
     end
 
-    def read(path)
-      file = File.open(path) do |f|
-        current_vendor = nil
-        f.each_line do |line|
-        	next if line =~ /^\#/	# discard comments
-        	split_line = line.split(/\s+/)
-        	next if split_line == []
-          case split_line.first.upcase
-          when "ATTRIBUTE"
-            current_vendor.nil? ? set_attr(split_line) : set_vendor_attr(current_vendor, split_line)
-          when "VALUE"
-            current_vendor.nil? ? set_value(split_line) : set_vendor_value(current_vendor, split_line)
-          when "VENDOR"
-            add_vendor(split_line)
-          when "BEGIN-VENDOR"
-            current_vendor = set_vendor(split_line)
-          when "END-VENDOR"
-            current_vendor = nil
-          end
-        end
-      end
+    def read_files(path)
+      dict_files = File.join(path, "*")
+      Dir.glob(dict_files) { |file|
+        read_attributes(file)
+      }
+      Dir.glob(dict_files) { |file|
+        read_values(file)
+      }
     end
-
+    
     def find_attribute_by_name(name)
       @attributes.find_by_name(name)
     end
@@ -67,9 +54,59 @@ module Radiustar
     class << self
 
       def default
-        new DEFAULT_DICTIONARY_PATH
+        new DEFAULT_DICTIONARIES_PATH
       end
 
+    end
+
+    protected
+    
+    def read_attributes(path)
+      file = File.open(path) do |f|
+        current_vendor = nil
+        f.each_line do |line|
+          next if line =~ /^\#/	# discard comments
+          split_line = line.split(/\s+/)
+          next if split_line == []
+          case split_line.first.upcase
+          when "ATTRIBUTE"
+            current_vendor.nil? ? set_attr(split_line) : set_vendor_attr(current_vendor, split_line)
+          when "VENDOR"
+            add_vendor(split_line)
+          when "BEGIN-VENDOR"
+            current_vendor = set_vendor(split_line)
+          when "END-VENDOR"
+            current_vendor = nil
+          end
+        end
+      end
+    end
+
+    def read_values(path)
+      file = File.open(path) do |f|
+        current_vendor = nil
+        f.each_line do |line|
+          next if line =~ /^\#/	# discard comments
+          split_line = line.split(/\s+/)
+          next if split_line == []
+          case split_line.first.upcase
+          when "VALUE"
+            if current_vendor.nil?
+              set_value(split_line)
+            else
+              begin
+                set_vendor_value(current_vendor, split_line)
+              rescue
+                set_value(split_line)
+              end
+            end
+          when "BEGIN-VENDOR"
+            current_vendor = set_vendor(split_line)
+          when "END-VENDOR"
+            current_vendor = nil
+          end
+        end
+      end
     end
 
     private
