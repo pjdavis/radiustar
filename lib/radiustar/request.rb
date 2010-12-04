@@ -4,12 +4,14 @@ module Radiustar
 
   class Request
 
-    def initialize(server, my_ip = nil, dict_file = nil)
-      @dict = dict_file.nil? ? Dictionary.default : Dictionary.new(dict_file)
+    def initialize(server, options = {})
+      @dict = options[:dict].nil? ? Dictionary.default : options[:dict]
+      @nas_ip = options[:nas_ip] || get_my_ip(@host)
+      @nas_identifier = options[:nas_identifier] || @nas_ip
+      @reply_timeout = options[:reply_timeout].nil? ? 60 : options[:reply_timeout].to_i
+      @retries_number = options[:retries_number].nil? ? 1 : options[:retries_number].to_i
 
       @host, @port = server.split(":")
-      
-      @my_ip = my_ip || get_my_ip(@host)
 
       @port = Socket.getservbyname("radius", "udp") unless @port
       @port = 1812 unless @port
@@ -18,29 +20,70 @@ module Radiustar
       @socket.connect(@host, @port)
     end
 
-    def authenticate(name, password, secret)
+    def authenticate(name, password, secret, user_attributes = {})
       @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.gen_auth_authenticator
       @packet.code = 'Access-Request'
-      @packet.gen_authenticator
       @packet.set_attribute('User-Name', name)
-      @packet.set_attribute('NAS-IP-Address', @my_ip)
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
       @packet.set_encoded_attribute('User-Password', password, secret)
-      send_packet
-      @recieved_packet = recv_packet
-      return @recieved_packet.code == 'Access-Accept'
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      begin
+        send_packet
+        @recieved_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (@retries_number -= 1) > 0
+        raise
+      end
+
+      reply = { :code => @recieved_packet.code }
+      reply.merge @recieved_packet.attributes
+    end
+    
+    def accounting_request(status_type, name, secret, sessionid, user_attributes = {})
+
+      @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.code = 'Accounting-Request'
+
+      @packet.set_attribute('User-Name', name)
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
+      @packet.set_attribute('Acct-Status-Type', status_type)
+      @packet.set_attribute('Acct-Session-Id', sessionid)
+      @packet.set_attribute('Acct-Authentic', 'RADIUS')
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      @packet.gen_acct_authenticator(secret)
+
+      begin
+        send_packet
+        @recieved_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (@retries_number -= 1) > 0
+        raise
+      end
+
+      return true
     end
 
-    def get_attributes(name, password, secret)
-      @packet = Packet.new(@dict, Process.pid & 0xff)
-      @packet.code = 'Access-Request'
-      @packet.gen_authenticator
-      @packet.set_attribute('User-Name', name)
-      @packet.set_attribute('NAS-IP-Address', @my_ip)
-      @packet.set_encoded_attribute('User-Password', password, secret)
-      send_packet
-      @recieved_packet = recv_packet
-      recieved_thing = [@recieved_packet.code]
-      recieved_thing << @recieved_packet.attributes
+    def accounting_start(name, secret, sessionid, options = {})
+      accounting_request('Start', name, secret, sessionid, options)
+    end
+
+    def accounting_update(name, secret, sessionid, options = {})
+      accounting_request('Interim-Update', name, secret, sessionid, options)
+    end
+
+    def accounting_stop(name, secret, sessionid, options = {})
+      accounting_request('Stop', name, secret, sessionid, options)
     end
 
     def inspect
@@ -55,9 +98,9 @@ module Radiustar
       @socket.send(data, 0)
     end
 
-    def recv_packet
-      if select([@socket], nil, nil, 60) == nil
-	      raise "Timed out waiting for response packet from server"
+    def recv_packet(timeout)
+      if select([@socket], nil, nil, timeout.to_i) == nil
+        raise "Timed out waiting for response packet from server"
       end
       data = @socket.recvfrom(64)
       Packet.new(@dict, Process.pid & 0xff, data[0])

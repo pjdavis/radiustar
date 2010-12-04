@@ -38,7 +38,7 @@ module Radiustar
 
     # Generate an authenticator. It will try to use /dev/urandom if
     # possible, or the system rand call if that's not available.
-    def gen_authenticator
+    def gen_auth_authenticator
       if (File.exist?("/dev/urandom"))
         File.open("/dev/urandom") do |urandom|
           @authenticator = urandom.read(16)
@@ -50,6 +50,31 @@ module Radiustar
         end
         @authenticator = @authenticator.pack("n8")
       end
+    end
+
+    def gen_acct_authenticator(secret)
+      # From RFC2866
+      # Request Authenticator
+      # 
+      #       In Accounting-Request Packets, the Authenticator value is a 16
+      #       octet MD5 [5] checksum, called the Request Authenticator.
+      # 
+      #       The NAS and RADIUS accounting server share a secret.  The Request
+      #       Authenticator field in Accounting-Request packets contains a one-
+      #       way MD5 hash calculated over a stream of octets consisting of the
+      #       Code + Identifier + Length + 16 zero octets + request attributes +
+      #       shared secret (where + indicates concatenation).  The 16 octet MD5
+      #       hash value is stored in the Authenticator field of the
+      #       Accounting-Request packet.
+      # 
+      #       Note that the Request Authenticator of an Accounting-Request can
+      #       not be done the same way as the Request Authenticator of a RADIUS
+      #       Access-Request, because there is no User-Password attribute in an
+      #       Accounting-Request.
+      #       
+      @authenticator = "\000"*16
+      @authenticator = Digest::MD5.digest(pack + secret)
+      @packed = nil
     end
 
     def set_attribute(name, value)
@@ -75,14 +100,18 @@ module Radiustar
     def pack
 
       attstr = ""
-      @attributes.each_pair do |attribute, value|
-        attribute = @dict.find_attribute_by_name(attribute)
+      @attributes.each_pair do |attribute_s, value|
+        attribute = @dict.find_attribute_by_name(attribute_s)
+        raise "Undefned attribute '#{attribute_s}'." if attribute.nil?
         anum = attribute.id
         val = case attribute.type
         when "string"
           value
         when "integer"
-          [attribute.has_values? ? attribute.find_values_by_id(value) : value].pack("N")
+          if attribute.has_values?
+            raise "Invalid value name '#{value}'" if attribute.find_values_by_name(value).nil?
+          end
+          [attribute.has_values? ? attribute.find_values_by_name(value).id : value].pack("N")
         when "ipaddr"
           [inet_aton(value)].pack("N")
         when "date"
@@ -112,7 +141,7 @@ module Radiustar
         attribute_type = attribute_type.to_i
 
         attribute = @dict.find_attribute_by_id(attribute_type)
-        attribute_value = case attribute.class
+        attribute_value = case attribute.type
         when 'string'
           attribute_value
         when 'integer'
