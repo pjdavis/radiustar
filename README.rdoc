@@ -83,7 +83,7 @@ Ruby Radius Library
 
 == INSTALL:
 
-	gem install radiustar
+	gem install dguerri-radiustar
 
 == LICENSE:
 
