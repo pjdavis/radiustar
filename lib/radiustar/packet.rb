@@ -75,6 +75,21 @@ module Radiustar
       @authenticator = "\000"*16
       @authenticator = Digest::MD5.digest(pack + secret)
       @packed = nil
+      @authenticator
+    end
+
+    def validate_acct_authenticator(secret)
+      if @authenticator
+        original_authenticator = @authenticator
+        if gen_acct_authenticator(secret) == original_authenticator
+          true
+        else
+          @authenticator = original_authenticator
+          false
+        end
+      else
+        false
+      end
     end
 
     def set_attribute(name, value)
