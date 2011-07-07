@@ -131,7 +131,7 @@ module Radiustar
 
     def unpack
       @code, @id, len, @authenticator, attribute_data = @packed.unpack(P_HDR)
-      @code = CODES.index(@code)
+      @code = CODES.key(@code)
 
       unset_all_attributes
 
