@@ -25,10 +25,13 @@ Gem::Specification.new do |s|
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
       s.add_development_dependency(%q<bones>, [">= 3.4.1"])
+      s.add_development_dependency(%q<ipaddr_extensions>)
     else
       s.add_dependency(%q<bones>, [">= 3.4.1"])
+      s.add_dependency(%q<ipaddr_extensions>)
     end
   else
     s.add_dependency(%q<bones>, [">= 3.4.1"])
+    s.add_dependency(%q<ipaddr_extensions>)
   end
 end
