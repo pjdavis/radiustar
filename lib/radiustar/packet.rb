@@ -1,6 +1,7 @@
 module Radiustar
 
   require 'digest/md5'
+  require 'ipaddr_extensions'
 
   class Packet
 
@@ -15,7 +16,7 @@ module Radiustar
     P_ATTR = "CCa*"		# pack template for attribute
 
     attr_accessor :code
-    attr_reader :id, :attributes
+    attr_reader :id, :attributes, :authenticator
 
     def initialize(dictionary, id, data = nil)
       @dict = dictionary
@@ -78,6 +79,13 @@ module Radiustar
       @authenticator
     end
 
+    def gen_acct_response_authenticator(secret, request_authenticator)
+      @authenticator = request_authenticator
+      @authenticator = Digest::MD5.digest(pack + secret)
+      @packed = nil
+      @authenticator
+    end
+
     def validate_acct_authenticator(secret)
       if @authenticator
         original_authenticator = @authenticator
@@ -93,11 +101,11 @@ module Radiustar
     end
 
     def set_attribute(name, value)
-      @attributes[name] = value
+      @attributes[name] = Attribute.new(@dict, name, value)
     end
 
     def unset_attribute(name)
-      @attributes[name] = nil
+      @attributes.delete(name)
     end
 
     def attribute(name)
@@ -105,40 +113,18 @@ module Radiustar
     end
 
     def unset_all_attributes
-      @attributes = Hash.new
+      @attributes = {}
     end
 
     def set_encoded_attribute(name, value, secret)
-      @attributes[name] = encode(value, secret)
+      @attributes[name] = Attribute.new(@dict, name, encode(value, secret))
     end
 
     def pack
-
       attstr = ""
-      @attributes.each_pair do |attribute_s, value|
-        attribute = @dict.find_attribute_by_name(attribute_s)
-        raise "Undefned attribute '#{attribute_s}'." if attribute.nil?
-        anum = attribute.id
-        val = case attribute.type
-        when "string"
-          value
-        when "integer"
-          if attribute.has_values?
-            raise "Invalid value name '#{value}'" if attribute.find_values_by_name(value).nil?
-          end
-          [attribute.has_values? ? attribute.find_values_by_name(value).id : value].pack("N")
-        when "ipaddr"
-          [inet_aton(value)].pack("N")
-        when "date"
-          [value].pack("N")
-        when "time"
-          [value].pack("N")
-        else
-          next
-        end
-        attstr += [attribute.id, val.length + 2, val].pack(P_ATTR)
+      @attributes.values.each do |attribute|
+        attstr += attribute.pack
       end
-
       @packed = [CODES[@code], @id, attstr.length + HDRLEN, @authenticator, attstr].pack(P_HDR)
     end
 
@@ -162,7 +148,7 @@ module Radiustar
         when 'integer'
           attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
         when 'ipaddr'
-          inet_ntoa(attribute_value.unpack("N")[0])
+          attribute_value.unpack("N")[0].to_ip.to_s
         when 'time'
           attribute_value.unpack("N")[0]
         when 'date'
@@ -172,17 +158,6 @@ module Radiustar
         set_attribute(attribute.name, attribute_value) if attribute
         attribute_data[0, length] = ""
       end
-    end
-
-    def inet_aton(hostname)
-      if (hostname =~ /([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/)
-        return (($1.to_i & 0xff) << 24) + (($2.to_i & 0xff) << 16) + (($3.to_i & 0xff) << 8) + (($4.to_i & 0xff))
-      end
-      0
-    end
-
-    def inet_ntoa(iaddr)
-      sprintf("%d.%d.%d.%d", (iaddr >> 24) & 0xff, (iaddr >> 16) & 0xff, (iaddr >> 8) & 0xff, (iaddr) & 0xff)
     end
 
     def xor_str(str1, str2)
@@ -221,5 +196,58 @@ module Radiustar
       return decoded_value
     end
 
+    class Attribute < Struct.new(:dict, :name, :value)
+
+      attr_reader :dict, :name
+      attr_accessor :value
+
+      def initialize dict, name, value
+        @dict = dict
+        @name = name
+        @value = value.is_a?(Attribute) ? value.to_s : value
+      end
+
+      def pack
+        attribute = @dict.find_attribute_by_name(@name)
+        raise "Undefined attribute '#{@name}'." if attribute.nil?
+
+        anum = attribute.id
+        val = case attribute.type
+              when "string"
+                @value
+              when "integer"
+                raise "Invalid value name '#{@value}'." if attribute.has_values? && attribute.find_values_by_name(@value).nil?
+                [attribute.has_values? ? attribute.find_values_by_name(@value).id : @value].pack("N")
+              when "ipaddr"
+                [@value.to_ip.to_i].pack("N")
+              when "ipv6addr"
+                [@value.to_ip.to_i].pack("N")
+              when "date"
+                [@value].pack("N")
+              when "time"
+                [@value].pack("N")
+              else
+                ""
+              end
+        begin
+        [anum, 
+          val.length + 2, 
+          val
+        ].pack(P_ATTR)
+        rescue 
+          puts "#{@name} => #{@value}"
+          puts [anum, val.length + 2, val].inspect
+        end
+      end
+
+      def inspect
+        @value
+      end
+
+      def to_s
+        @value
+      end
+
+    end
   end
 end
