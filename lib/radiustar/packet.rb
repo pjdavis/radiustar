@@ -109,7 +109,7 @@ module Radiustar
     end
 
     def attribute(name)
-      @attributes[name].value
+      @attributes[name] ? @attributes[name].value : nil
     end
 
     def unset_all_attributes
