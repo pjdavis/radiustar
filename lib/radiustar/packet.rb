@@ -109,7 +109,9 @@ module Radiustar
     end
 
     def attribute(name)
-      @attributes[name] ? @attributes[name].value : nil
+      if @attributes[name]
+        @attributes[name].value
+      end
     end
 
     def unset_all_attributes
