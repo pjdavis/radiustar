@@ -85,6 +85,7 @@ module Radiustar
       @packed = nil
       @authenticator
     end
+    alias :gen_acct_response_authenticator :gen_auth_response_authenticator
 
     def validate_acct_authenticator(secret)
       if @authenticator
@@ -118,6 +119,12 @@ module Radiustar
 
     def set_encoded_attribute(name, value, secret)
       @attributes[name] = Attribute.new(@dict, name, encode(value, secret))
+    end
+
+    def decode_attribute(name, secret)
+      if @attributes[name]
+        decode(@attributes[name].value.to_s, secret)
+      end
     end
 
     def pack
