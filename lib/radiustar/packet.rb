@@ -79,13 +79,12 @@ module Radiustar
       @authenticator
     end
 
-    def gen_acct_response_authenticator(secret, request_authenticator)
+    def gen_response_authenticator(secret, request_authenticator)
       @authenticator = request_authenticator
       @authenticator = Digest::MD5.digest(pack + secret)
       @packed = nil
       @authenticator
     end
-    alias :gen_acct_response_authenticator :gen_auth_response_authenticator
 
     def validate_acct_authenticator(secret)
       if @authenticator
