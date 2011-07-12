@@ -204,21 +204,62 @@ module Radiustar
       return decoded_value
     end
 
-    class Attribute < Struct.new(:dict, :name, :value)
+    class Attribute
 
-      attr_reader :dict, :name
+      attr_reader :dict, :name, :vendor
       attr_accessor :value
 
-      def initialize dict, name, value
+      def initialize dict, name, value, vendor=nil
         @dict = dict
-        @name = name
+        # This is the cheapest and easiest way to add VSA's!
+        if (name && (chunks = name.split('/')) && (chunks.size == 2))
+          @vendor = chunks[0]
+          @name = chunks[1]
+        else
+          @name = name
+        end
+        @vendor ||= vendor
         @value = value.is_a?(Attribute) ? value.to_s : value
       end
 
+      def vendor?
+        !!@vendor
+      end
+
       def pack
-        attribute = @dict.find_attribute_by_name(@name)
+        attribute = if (vendor? && (@dict.vendors.find_by_name(@vendor)))
+                      @dict.vendors.find_by_name(@vendor).attributes.find_by_name(@name)
+                    else
+                      @dict.find_attribute_by_name(@name)
+                    end
         raise "Undefined attribute '#{@name}'." if attribute.nil?
 
+        if vendor?
+          pack_vendor_specific_attribute attribute
+        else
+          pack_attribute attribute
+        end
+      end
+
+      def inspect
+        @value
+      end
+
+      def to_s
+        @value
+      end
+
+      private
+
+      def pack_vendor_specific_attribute attribute
+        inside_attribute = pack_attribute attribute
+        vid = attribute.vendor.id.to_i
+        header = [ 26, inside_attribute.size + 6 ].pack("CC") # 26: Type = Vendor-Specific, 4: length of Vendor-Id field
+        header += [ 0, vid >> 16, vid >> 8, vid ].pack("CCCC") # first byte of Vendor-Id is 0
+        header + inside_attribute
+      end
+
+      def pack_attribute attribute
         anum = attribute.id
         val = case attribute.type
               when "string"
@@ -229,7 +270,8 @@ module Radiustar
               when "ipaddr"
                 [@value.to_ip.to_i].pack("N")
               when "ipv6addr"
-                [@value.to_ip.to_i].pack("N")
+                ipi = @value.to_ip.to_i
+                [ ipi >> 96, ipi >> 64, ipi >> 32, ipi ].pack("NNNN")
               when "date"
                 [@value].pack("N")
               when "time"
@@ -246,14 +288,6 @@ module Radiustar
           puts "#{@name} => #{@value}"
           puts [anum, val.length + 2, val].inspect
         end
-      end
-
-      def inspect
-        @value
-      end
-
-      def to_s
-        @value
       end
 
     end
