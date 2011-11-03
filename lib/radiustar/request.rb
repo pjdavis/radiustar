@@ -76,6 +76,38 @@ module Radiustar
       return true
     end
 
+    def generic_request(code, secret, user_attributes = {})
+      @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.code =  code
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      @packet.gen_acct_authenticator(secret)
+
+      retries = @retries_number
+      begin
+        send_packet
+        @received_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (retries -= 1) > 0
+        raise
+      end
+
+      return true
+    end
+
+    def coa_request(secret, user_attributes = {})
+      generic_request('CoA-Request', secret, user_attributes)
+    end
+
+    def disconnect_request(secret, user_attributes = {})
+      generic_request('Disconnect-Request', secret, user_attributes)
+    end
+
     def accounting_start(name, secret, sessionid, options = {})
       accounting_request('Start', name, secret, sessionid, options)
     end

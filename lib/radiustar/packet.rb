@@ -8,7 +8,10 @@ module Radiustar
     CODES = { 'Access-Request' => 1,        'Access-Accept' => 2,
               'Access-Reject' => 3,         'Accounting-Request' => 4,
               'Accounting-Response' => 5,   'Access-Challenge' => 11,
-              'Status-Server' => 12,        'Status-Client' => 13 }
+              'Status-Server' => 12,        'Status-Client' => 13,
+              'Disconnect-Request' => 40,   'Disconnect-ACK' => 41,
+              'Disconnect-NAK' => 42,       'CoA-Request' => 43,
+              'CoA-ACK' => 44,              'CoA-NAK' => 45 }
 
 
     HDRLEN = 1 + 1 + 2 + 16	# size of packet header
