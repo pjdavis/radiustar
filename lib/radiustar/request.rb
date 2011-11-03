@@ -33,16 +33,17 @@ module Radiustar
         @packet.set_attribute(name, value)
       end
 
+      retries = @retries_number
       begin
         send_packet
-        @recieved_packet = recv_packet(@reply_timeout)
+        @received_packet = recv_packet(@reply_timeout)
       rescue Exception => e
-        retry if (@retries_number -= 1) > 0
+        retry if (retries -= 1) > 0
         raise
       end
 
-      reply = { :code => @recieved_packet.code }
-      reply.merge @recieved_packet.attributes
+      reply = { :code => @received_packet.code }
+      reply.merge @received_packet.attributes
     end
     
     def accounting_request(status_type, name, secret, sessionid, user_attributes = {})
@@ -63,11 +64,12 @@ module Radiustar
 
       @packet.gen_acct_authenticator(secret)
 
+      retries = @retries_number
       begin
         send_packet
-        @recieved_packet = recv_packet(@reply_timeout)
+        @received_packet = recv_packet(@reply_timeout)
       rescue Exception => e
-        retry if (@retries_number -= 1) > 0
+        retry if (retries -= 1) > 0
         raise
       end
 
@@ -94,7 +96,6 @@ module Radiustar
 
     def send_packet
       data = @packet.pack
-      @packet.increment_id
       @socket.send(data, 0)
     end
 
