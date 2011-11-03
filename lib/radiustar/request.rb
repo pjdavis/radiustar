@@ -102,7 +102,7 @@ module Radiustar
       if select([@socket], nil, nil, timeout.to_i) == nil
         raise "Timed out waiting for response packet from server"
       end
-      data = @socket.recvfrom(64)
+      data = @socket.recvfrom(4096) # rfc2865 max packet length
       Packet.new(@dict, Process.pid & 0xff, data[0])
     end
 

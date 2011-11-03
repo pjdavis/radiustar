@@ -140,6 +140,8 @@ module Radiustar
 
     def unpack
       @code, @id, len, @authenticator, attribute_data = @packed.unpack(P_HDR)
+      raise "Incomplete Packet(read #{@packed.length} != #{len})" if @packed.length != len
+
       @code = CODES.key(@code)
       vendor = nil
 
