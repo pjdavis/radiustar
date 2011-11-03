@@ -141,6 +141,7 @@ module Radiustar
     def unpack
       @code, @id, len, @authenticator, attribute_data = @packed.unpack(P_HDR)
       @code = CODES.key(@code)
+      vendor = nil
 
       unset_all_attributes
 
@@ -149,7 +150,15 @@ module Radiustar
         attribute_type, attribute_value = attribute_data.unpack("Cxa#{length-2}")
         attribute_type = attribute_type.to_i
 
-        attribute = @dict.find_attribute_by_id(attribute_type)
+        if attribute_type == 26 # Vendor Specific Attribute
+          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
+          vendor =  @dict.vendors.find_by_id(vid)
+          attribute = vendor.find_attribute_by_id(attribute_type)
+        else
+          vendor = nil
+          attribute = @dict.find_attribute_by_id(attribute_type)
+        end
+
         attribute_value = case attribute.type
         when 'string'
           attribute_value
@@ -163,7 +172,12 @@ module Radiustar
           attribute_value.unpack("N")[0]
         end
 
-        set_attribute(attribute.name, attribute_value) if attribute
+        if vendor
+          set_attribute(vendor.name+"/"+attribute.name, attribute_value) if attribute
+        else
+          set_attribute(attribute.name, attribute_value) if attribute
+        end
+
         attribute_data[0, length] = ""
       end
     end
