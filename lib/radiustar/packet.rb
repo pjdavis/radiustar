@@ -145,7 +145,7 @@ module Radiustar
       i = 0
       newstr = ""
       str1.each_byte do |c1|
-        c2 = str2[i]
+        c2 = str2.getbyte(i)
         newstr = newstr << (c1 ^ c2)
         i = i+1
       end
