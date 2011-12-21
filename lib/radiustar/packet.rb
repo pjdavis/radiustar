@@ -168,7 +168,7 @@ module Radiustar
       decoded_value = ""
       lastround = @authenticator
       0.step(value.length-1, 16) do |i|
-	      decoded_value = xor_str(value[i, 16], Digest::MD5.digest(secret + lastround))
+	      decoded_value += xor_str(value[i, 16], Digest::MD5.digest(secret + lastround))
 	      lastround = value[i, 16]
       end
 
