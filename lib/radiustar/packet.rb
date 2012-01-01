@@ -144,6 +144,7 @@ module Radiustar
     def xor_str(str1, str2)
       i = 0
       newstr = ""
+      str2 = str2.bytes.to_a
       str1.each_byte do |c1|
         c2 = str2[i]
         newstr = newstr << (c1 ^ c2)
@@ -151,6 +152,18 @@ module Radiustar
       end
       newstr
     end
+    
+    def xor_str(str1, str2)
+    145       i = 0
+    146       newstr = ""
+    147       str2 = str2.bytes.to_a
+    148       str1.each_byte do |c1|
+    149         c2 = str2[i]
+    150         newstr = newstr << (c1 ^ c2)
+    151         i = i+1
+    152       end
+    153       newstr
+    154     end
 
     def encode(value, secret)
       lastround = @authenticator
