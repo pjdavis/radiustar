@@ -32,27 +32,50 @@ Ruby Radius Library
 
 == FEATURES
 
-* Import your own radius dictionary
-* Test authentication
-* Check radius replies
-
-== COMING SOON
-
-* Use vendor specific attributes
+* Import your own radius dictionaries
+* Authentication
+* Accounting
 
 == SYNOPSIS:
 
+  require 'rubygems'
   require 'radiustar'
 
-	req = Radiustar::Request.new('server')
-	resp = req.authenticate('my_user', 'my_password', 'shared_secret')
-	resp #=> true
+  # Load dictionaries from freeradius directory
+  dict = Radiustar::Dictionary.new('/usr/share/freeradius/')
 
-	attrs = req.get_attributes('my_user', 'my_password', 'shared_secret')
-	attrs #=> ["Access-Accept", {"Service-Type"=>"Framed-User",
-						                   "Framed-Protocol"=>"PPP",
-						 									 "Framed-IP-Address"=>"255.255.255.254",
-															 "Framed-IP-Netmask"=>"255.255.255.255"} ]
+  # Lets get authenticated
+  auth_custom_attr = {
+    'Framed-Address'  => '127.0.0.1',
+    'NAS-Port'        => 0,
+    'NAS-Port-Type'   => 'Ethernet'
+  }
+
+  req = Radiustar::Request.new('127.0.0.1', { :dict => dict })
+  reply = req.authenticate('John Doe', 'hello', 'testing123', auth_custom_attr)
+
+  if reply[:code] == 'Access-Accept'
+    req = Radiustar::Request.new('127.0.0.1:1813', { :dict => dict })
+    
+    acct_custom_attr = {
+      'Framed-Address'  => '127.0.0.1',
+      'NAS-Port'        => 0,
+      'NAS-Port-Type'   => 'Ethernet',
+      'Acct-Session-Time' => 0
+    }
+    
+    timings = Time.now
+    reply = req.accounting_start('John Doe', 'testing123', '123456', acct_custom_attr)
+    
+    sleep(rand 5)
+    acct_custom_attr['Acct-Session-Time'] = Time.now - timings
+    reply = req.accounting_update('John Doe', 'testing123', '123456', acct_custom_attr)
+    
+    sleep(rand 5)
+    acct_custom_attr['Acct-Session-Time'] = Time.now - timings
+    reply = req.accounting_stop('John Doe', 'testing123', '123456', acct_custom_attr)
+
+  end
 
 == REQUIREMENTS:
 
@@ -60,7 +83,7 @@ Ruby Radius Library
 
 == INSTALL:
 
-	gem install radiustar
+	gem install dguerri-radiustar
 
 == LICENSE:
 

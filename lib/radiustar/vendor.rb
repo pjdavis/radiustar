@@ -32,7 +32,7 @@ module Radiustar
     def initialize(name, id)
       @name = name
       @id = id
-      @attributes = AttributesCollection.new
+      @attributes = AttributesCollection.new self
     end
 
     def add_attribute(name, id, type)

@@ -1,13 +1,17 @@
 module Radiustar
 
   require 'digest/md5'
+  require 'ipaddr_extensions'
 
   class Packet
 
     CODES = { 'Access-Request' => 1,        'Access-Accept' => 2,
               'Access-Reject' => 3,         'Accounting-Request' => 4,
               'Accounting-Response' => 5,   'Access-Challenge' => 11,
-              'Status-Server' => 12,        'Status-Client' => 13 }
+              'Status-Server' => 12,        'Status-Client' => 13,
+              'Disconnect-Request' => 40,   'Disconnect-ACK' => 41,
+              'Disconnect-NAK' => 42,       'CoA-Request' => 43,
+              'CoA-ACK' => 44,              'CoA-NAK' => 45 }
 
 
     HDRLEN = 1 + 1 + 2 + 16	# size of packet header
@@ -15,7 +19,7 @@ module Radiustar
     P_ATTR = "CCa*"		# pack template for attribute
 
     attr_accessor :code
-    attr_reader :id, :attributes
+    attr_reader :id, :attributes, :authenticator
 
     def initialize(dictionary, id, data = nil)
       @dict = dictionary
@@ -38,7 +42,7 @@ module Radiustar
 
     # Generate an authenticator. It will try to use /dev/urandom if
     # possible, or the system rand call if that's not available.
-    def gen_authenticator
+    def gen_auth_authenticator
       if (File.exist?("/dev/urandom"))
         File.open("/dev/urandom") do |urandom|
           @authenticator = urandom.read(16)
@@ -52,49 +56,86 @@ module Radiustar
       end
     end
 
+    def gen_acct_authenticator(secret)
+      # From RFC2866
+      # Request Authenticator
+      # 
+      #       In Accounting-Request Packets, the Authenticator value is a 16
+      #       octet MD5 [5] checksum, called the Request Authenticator.
+      # 
+      #       The NAS and RADIUS accounting server share a secret.  The Request
+      #       Authenticator field in Accounting-Request packets contains a one-
+      #       way MD5 hash calculated over a stream of octets consisting of the
+      #       Code + Identifier + Length + 16 zero octets + request attributes +
+      #       shared secret (where + indicates concatenation).  The 16 octet MD5
+      #       hash value is stored in the Authenticator field of the
+      #       Accounting-Request packet.
+      # 
+      #       Note that the Request Authenticator of an Accounting-Request can
+      #       not be done the same way as the Request Authenticator of a RADIUS
+      #       Access-Request, because there is no User-Password attribute in an
+      #       Accounting-Request.
+      #       
+      @authenticator = "\000"*16
+      @authenticator = Digest::MD5.digest(pack + secret)
+      @packed = nil
+      @authenticator
+    end
+
+    def gen_response_authenticator(secret, request_authenticator)
+      @authenticator = request_authenticator
+      @authenticator = Digest::MD5.digest(pack + secret)
+      @packed = nil
+      @authenticator
+    end
+
+    def validate_acct_authenticator(secret)
+      if @authenticator
+        original_authenticator = @authenticator
+        if gen_acct_authenticator(secret) == original_authenticator
+          true
+        else
+          @authenticator = original_authenticator
+          false
+        end
+      else
+        false
+      end
+    end
+
     def set_attribute(name, value)
-      @attributes[name] = value
+      @attributes[name] = Attribute.new(@dict, name, value)
     end
 
     def unset_attribute(name)
-      @attributes[name] = nil
+      @attributes.delete(name)
     end
 
     def attribute(name)
-      @attributes[name]
+      if @attributes[name]
+        @attributes[name].value
+      end
     end
 
     def unset_all_attributes
-      @attributes = Hash.new
+      @attributes = {}
     end
 
     def set_encoded_attribute(name, value, secret)
-      @attributes[name] = encode(value, secret)
+      @attributes[name] = Attribute.new(@dict, name, encode(value, secret))
+    end
+
+    def decode_attribute(name, secret)
+      if @attributes[name]
+        decode(@attributes[name].value.to_s, secret)
+      end
     end
 
     def pack
-
       attstr = ""
-      @attributes.each_pair do |attribute, value|
-        attribute = @dict.find_attribute_by_name(attribute)
-        anum = attribute.id
-        val = case attribute.type
-        when "string"
-          value
-        when "integer"
-          [attribute.has_values? ? attribute.find_values_by_id(value) : value].pack("N")
-        when "ipaddr"
-          [inet_aton(value)].pack("N")
-        when "date"
-          [value].pack("N")
-        when "time"
-          [value].pack("N")
-        else
-          next
-        end
-        attstr += [attribute.id, val.length + 2, val].pack(P_ATTR)
+      @attributes.values.each do |attribute|
+        attstr += attribute.pack
       end
-
       @packed = [CODES[@code], @id, attstr.length + HDRLEN, @authenticator, attstr].pack(P_HDR)
     end
 
@@ -102,7 +143,10 @@ module Radiustar
 
     def unpack
       @code, @id, len, @authenticator, attribute_data = @packed.unpack(P_HDR)
-      @code = CODES.index(@code)
+      raise "Incomplete Packet(read #{@packed.length} != #{len})" if @packed.length != len
+
+      @code = CODES.key(@code)
+      vendor = nil
 
       unset_all_attributes
 
@@ -111,41 +155,43 @@ module Radiustar
         attribute_type, attribute_value = attribute_data.unpack("Cxa#{length-2}")
         attribute_type = attribute_type.to_i
 
-        attribute = @dict.find_attribute_by_id(attribute_type)
-        attribute_value = case attribute.class
+        if attribute_type == 26 # Vendor Specific Attribute
+          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
+          vendor =  @dict.vendors.find_by_id(vid)
+          attribute = vendor.find_attribute_by_id(attribute_type)
+        else
+          vendor = nil
+          attribute = @dict.find_attribute_by_id(attribute_type)
+        end
+
+        attribute_value = case attribute.type
         when 'string'
           attribute_value
         when 'integer'
           attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
         when 'ipaddr'
-          inet_ntoa(attribute_value.unpack("N")[0])
+          attribute_value.unpack("N")[0].to_ip.to_s
         when 'time'
           attribute_value.unpack("N")[0]
         when 'date'
           attribute_value.unpack("N")[0]
         end
 
-        set_attribute(attribute.name, attribute_value) if attribute
+        if vendor
+          set_attribute(vendor.name+"/"+attribute.name, attribute_value) if attribute
+        else
+          set_attribute(attribute.name, attribute_value) if attribute
+        end
+
         attribute_data[0, length] = ""
       end
-    end
-
-    def inet_aton(hostname)
-      if (hostname =~ /([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/)
-        return (($1.to_i & 0xff) << 24) + (($2.to_i & 0xff) << 16) + (($3.to_i & 0xff) << 8) + (($4.to_i & 0xff))
-      end
-      0
-    end
-
-    def inet_ntoa(iaddr)
-      sprintf("%d.%d.%d.%d", (iaddr >> 24) & 0xff, (iaddr >> 16) & 0xff, (iaddr >> 8) & 0xff, (iaddr) & 0xff)
     end
 
     def xor_str(str1, str2)
       i = 0
       newstr = ""
       str1.each_byte do |c1|
-        c2 = str2[i]
+        c2 = str2.bytes.to_a[i]
         newstr = newstr << (c1 ^ c2)
         i = i+1
       end
@@ -177,5 +223,92 @@ module Radiustar
       return decoded_value
     end
 
+    class Attribute
+
+      attr_reader :dict, :name, :vendor
+      attr_accessor :value
+
+      def initialize dict, name, value, vendor=nil
+        @dict = dict
+        # This is the cheapest and easiest way to add VSA's!
+        if (name && (chunks = name.split('/')) && (chunks.size == 2))
+          @vendor = chunks[0]
+          @name = chunks[1]
+        else
+          @name = name
+        end
+        @vendor ||= vendor
+        @value = value.is_a?(Attribute) ? value.to_s : value
+      end
+
+      def vendor?
+        !!@vendor
+      end
+
+      def pack
+        attribute = if (vendor? && (@dict.vendors.find_by_name(@vendor)))
+                      @dict.vendors.find_by_name(@vendor).attributes.find_by_name(@name)
+                    else
+                      @dict.find_attribute_by_name(@name)
+                    end
+        raise "Undefined attribute '#{@name}'." if attribute.nil?
+
+        if vendor?
+          pack_vendor_specific_attribute attribute
+        else
+          pack_attribute attribute
+        end
+      end
+
+      def inspect
+        @value
+      end
+
+      def to_s
+        @value
+      end
+
+      private
+
+      def pack_vendor_specific_attribute attribute
+        inside_attribute = pack_attribute attribute
+        vid = attribute.vendor.id.to_i
+        header = [ 26, inside_attribute.size + 6 ].pack("CC") # 26: Type = Vendor-Specific, 4: length of Vendor-Id field
+        header += [ 0, vid >> 16, vid >> 8, vid ].pack("CCCC") # first byte of Vendor-Id is 0
+        header + inside_attribute
+      end
+
+      def pack_attribute attribute
+        anum = attribute.id
+        val = case attribute.type
+              when "string"
+                @value
+              when "integer"
+                raise "Invalid value name '#{@value}'." if attribute.has_values? && attribute.find_values_by_name(@value).nil?
+                [attribute.has_values? ? attribute.find_values_by_name(@value).id : @value].pack("N")
+              when "ipaddr"
+                [@value.to_ip.to_i].pack("N")
+              when "ipv6addr"
+                ipi = @value.to_ip.to_i
+                [ ipi >> 96, ipi >> 64, ipi >> 32, ipi ].pack("NNNN")
+              when "date"
+                [@value].pack("N")
+              when "time"
+                [@value].pack("N")
+              else
+                ""
+              end
+        begin
+        [anum, 
+          val.length + 2, 
+          val
+        ].pack(P_ATTR)
+        rescue 
+          puts "#{@name} => #{@value}"
+          puts [anum, val.length + 2, val].inspect
+        end
+      end
+
+    end
   end
 end

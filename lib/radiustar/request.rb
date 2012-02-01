@@ -4,12 +4,14 @@ module Radiustar
 
   class Request
 
-    def initialize(server, my_ip = nil, dict_file = nil)
-      @dict = dict_file.nil? ? Dictionary.default : Dictionary.new(dict_file)
+    def initialize(server, options = {})
+      @dict = options[:dict].nil? ? Dictionary.default : options[:dict]
+      @nas_ip = options[:nas_ip] || get_my_ip(@host)
+      @nas_identifier = options[:nas_identifier] || @nas_ip
+      @reply_timeout = options[:reply_timeout].nil? ? 60 : options[:reply_timeout].to_i
+      @retries_number = options[:retries_number].nil? ? 1 : options[:retries_number].to_i
 
       @host, @port = server.split(":")
-      
-      @my_ip = my_ip || get_my_ip(@host)
 
       @port = Socket.getservbyname("radius", "udp") unless @port
       @port = 1812 unless @port
@@ -18,29 +20,104 @@ module Radiustar
       @socket.connect(@host, @port)
     end
 
-    def authenticate(name, password, secret)
+    def authenticate(name, password, secret, user_attributes = {})
       @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.gen_auth_authenticator
       @packet.code = 'Access-Request'
-      @packet.gen_authenticator
       @packet.set_attribute('User-Name', name)
-      @packet.set_attribute('NAS-IP-Address', @my_ip)
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
       @packet.set_encoded_attribute('User-Password', password, secret)
-      send_packet
-      @recieved_packet = recv_packet
-      return @recieved_packet.code == 'Access-Accept'
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      retries = @retries_number
+      begin
+        send_packet
+        @received_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (retries -= 1) > 0
+        raise
+      end
+
+      reply = { :code => @received_packet.code }
+      reply.merge @received_packet.attributes
+    end
+    
+    def accounting_request(status_type, name, secret, sessionid, user_attributes = {})
+
+      @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.code = 'Accounting-Request'
+
+      @packet.set_attribute('User-Name', name)
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
+      @packet.set_attribute('Acct-Status-Type', status_type)
+      @packet.set_attribute('Acct-Session-Id', sessionid)
+      @packet.set_attribute('Acct-Authentic', 'RADIUS')
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      @packet.gen_acct_authenticator(secret)
+
+      retries = @retries_number
+      begin
+        send_packet
+        @received_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (retries -= 1) > 0
+        raise
+      end
+
+      return true
     end
 
-    def get_attributes(name, password, secret)
+    def generic_request(code, secret, user_attributes = {})
       @packet = Packet.new(@dict, Process.pid & 0xff)
-      @packet.code = 'Access-Request'
-      @packet.gen_authenticator
-      @packet.set_attribute('User-Name', name)
-      @packet.set_attribute('NAS-IP-Address', @my_ip)
-      @packet.set_encoded_attribute('User-Password', password, secret)
-      send_packet
-      @recieved_packet = recv_packet
-      recieved_thing = [@recieved_packet.code]
-      recieved_thing << @recieved_packet.attributes
+      @packet.code =  code
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      @packet.gen_acct_authenticator(secret)
+
+      retries = @retries_number
+      begin
+        send_packet
+        @received_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (retries -= 1) > 0
+        raise
+      end
+
+      return true
+    end
+
+    def coa_request(secret, user_attributes = {})
+      generic_request('CoA-Request', secret, user_attributes)
+    end
+
+    def disconnect_request(secret, user_attributes = {})
+      generic_request('Disconnect-Request', secret, user_attributes)
+    end
+
+    def accounting_start(name, secret, sessionid, options = {})
+      accounting_request('Start', name, secret, sessionid, options)
+    end
+
+    def accounting_update(name, secret, sessionid, options = {})
+      accounting_request('Interim-Update', name, secret, sessionid, options)
+    end
+
+    def accounting_stop(name, secret, sessionid, options = {})
+      accounting_request('Stop', name, secret, sessionid, options)
     end
 
     def inspect
@@ -51,15 +128,14 @@ module Radiustar
 
     def send_packet
       data = @packet.pack
-      @packet.increment_id
       @socket.send(data, 0)
     end
 
-    def recv_packet
-      if select([@socket], nil, nil, 60) == nil
-	      raise "Timed out waiting for response packet from server"
+    def recv_packet(timeout)
+      if select([@socket], nil, nil, timeout.to_i) == nil
+        raise "Timed out waiting for response packet from server"
       end
-      data = @socket.recvfrom(64)
+      data = @socket.recvfrom(4096) # rfc2865 max packet length
       Packet.new(@dict, Process.pid & 0xff, data[0])
     end
 

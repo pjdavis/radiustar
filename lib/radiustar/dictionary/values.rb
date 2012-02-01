@@ -4,7 +4,7 @@ module Radiustar
 
     def initialize
       @collection = {}
-      @revcollection = []
+      @revcollection = {}
     end
 
     def add(name, id)

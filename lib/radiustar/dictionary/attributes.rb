@@ -2,13 +2,20 @@ module Radiustar
 
   class AttributesCollection < Array
 
-    def initialize
+    attr_accessor :vendor
+
+    def initialize vendor=nil
       @collection = {}
-      @revcollection = []
+      @revcollection = {}
+      @vendor = vendor if vendor
     end
 
     def add(name, id, type)
-      @collection[name] ||= Attribute.new(name, id.to_i, type)
+      if vendor?
+        @collection[name] ||= Attribute.new(name, id.to_i, type, @vendor)
+      else
+        @collection[name] ||= Attribute.new(name, id.to_i, type)
+      end
       @revcollection[id.to_i] ||= @collection[name]
       self << @collection[name]
     end
@@ -18,7 +25,11 @@ module Radiustar
     end
 
     def find_by_id(id)
-      @revcollection[id.to_i]
+      @revcollection[id]
+    end
+
+    def vendor?
+      !!@vendor
     end
 
   end
@@ -27,13 +38,14 @@ module Radiustar
 
     include Radiustar
 
-    attr_reader :name, :id, :type
+    attr_reader :name, :id, :type, :vendor
 
-    def initialize(name, id, type)
+    def initialize(name, id, type, vendor=nil)
       @values = ValuesCollection.new
       @name = name
       @id = id.to_i
       @type = type
+      @vendor = vendor if vendor
     end
 
     def add_value(name, id)
@@ -54,6 +66,10 @@ module Radiustar
 
     def values
       @values
+    end
+
+    def vendor?
+      !!@vendor
     end
 
   end
