@@ -83,7 +83,18 @@ Ruby Radius Library
 
 == INSTALL:
 
-	gem install dguerri-radiustar
+	gem install radiustar
+
+== Thanks:
+Thanks to everyone who has contributed to this project. Without your help and support, this would not have been possible.
+
+* charl
+* Mark Bryars
+* jamesotron
+* dguerri
+* gderosa
+* mkocher
+* bwlang
 
 == LICENSE:
 
