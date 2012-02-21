@@ -28,7 +28,7 @@ http://github.com/pjdavis/radiustar
 
 == DESCRIPTION:
 
-Ruby Radius Library
+Ruby Radius Library 
 
 == FEATURES
 
