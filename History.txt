@@ -1,3 +1,6 @@
+== 0.0.6 / 2012-04-11
+* Bugfixes by charl(https://github.com/pjdavis/radiustar/issues/8)
+
 == 0.0.5 / 2012-02-02
 * Bugfixes(charl, Mark Bryars, jamesotron, dguerri, gderosa, mkocher)
 * You can now use VSAs in packets (jamesotron)
