@@ -2,6 +2,8 @@ module Radiustar
 
   require 'digest/md5'
   require 'ipaddr_extensions'
+  require File.join(File.expand_path(File.dirname __FILE__), "old_hash") if RUBY_VERSION < '1.9.0'
+
 
   class Packet
 
@@ -59,10 +61,10 @@ module Radiustar
     def gen_acct_authenticator(secret)
       # From RFC2866
       # Request Authenticator
-      # 
+      #
       #       In Accounting-Request Packets, the Authenticator value is a 16
       #       octet MD5 [5] checksum, called the Request Authenticator.
-      # 
+      #
       #       The NAS and RADIUS accounting server share a secret.  The Request
       #       Authenticator field in Accounting-Request packets contains a one-
       #       way MD5 hash calculated over a stream of octets consisting of the
@@ -70,12 +72,12 @@ module Radiustar
       #       shared secret (where + indicates concatenation).  The 16 octet MD5
       #       hash value is stored in the Authenticator field of the
       #       Accounting-Request packet.
-      # 
+      #
       #       Note that the Request Authenticator of an Accounting-Request can
       #       not be done the same way as the Request Authenticator of a RADIUS
       #       Access-Request, because there is no User-Password attribute in an
       #       Accounting-Request.
-      #       
+      #
       @authenticator = "\000"*16
       @authenticator = Digest::MD5.digest(pack + secret)
       @packed = nil
@@ -299,11 +301,11 @@ module Radiustar
                 ""
               end
         begin
-        [anum, 
-          val.length + 2, 
+        [anum,
+          val.length + 2,
           val
         ].pack(P_ATTR)
-        rescue 
+        rescue
           puts "#{@name} => #{@value}"
           puts [anum, val.length + 2, val].inspect
         end
