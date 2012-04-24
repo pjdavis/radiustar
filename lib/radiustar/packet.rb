@@ -158,10 +158,19 @@ module Radiustar
         attribute_type = attribute_type.to_i
 
         if attribute_type == 26 # Vendor Specific Attribute
-          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
-          vendor =  @dict.vendors.find_by_id(vid)
-          attribute = vendor.find_attribute_by_id(attribute_type)
-        else
+          vid, vsa_attribute_type, vsa_attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
+          vendor = @dict.vendors.find_by_id(vid)
+          if vendor
+            attribute = vendor.find_attribute_by_id(attribute_type)
+            attribute_type = vsa_attribute_type
+            attribute_value = vsa_attribute_value
+          else
+            puts "Failed to find a vendor using id: #{vid}"
+          end
+        end
+
+        #unless the VSA attribute lookup worked, get it from the dict
+        unless attribute
           vendor = nil
           attribute = @dict.find_attribute_by_id(attribute_type)
         end
@@ -170,7 +179,18 @@ module Radiustar
         when 'string'
           attribute_value
         when 'integer'
-          attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
+          if attribute.has_values?
+            val_id = attribute_value.unpack("N")[0]
+            val = attribute.find_values_by_id(val_id)
+            if val
+              val.name
+            else
+              puts "Failed to find a value with id: #{val_id} (unpacked from #{attribute_value}) in attribute value list: #{attribute.values.join("\n")}"
+              nil
+            end
+          else
+            attribute_value.unpack("N")[0]
+          end
         when 'ipaddr'
           attribute_value.unpack("N")[0].to_ip.to_s
         when 'time'
