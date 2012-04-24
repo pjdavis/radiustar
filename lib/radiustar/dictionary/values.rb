@@ -38,6 +38,10 @@ module Radiustar
       @id = id.to_i
     end
 
+    def to_s
+      "#{id}:#{name}"
+    end
+
   end
 
 end
