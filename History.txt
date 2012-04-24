@@ -1,2 +1,19 @@
+== 0.0.6 / 2012-04-11
+* Bugfixes by charl(https://github.com/pjdavis/radiustar/issues/8)
+
+== 0.0.5 / 2012-02-02
+* Bugfixes(charl, Mark Bryars, jamesotron, dguerri, gderosa, mkocher)
+* You can now use VSAs in packets (jamesotron)
+* Add support for CoA and Disconnect Packets (Mark Bryars)
+
+== 0.0.4 / 2010-12/04
+* github fork (dguerri)
+* bugfixes
+* added multiple dictionary files support (dguerri)
+* added accounting support
+
+== 0.0.3 / 2010-06-30
+* no longer require to specify your own IP (via bwlang)
+
 == 0.0.1 / 2010-04-14
 * winning at radius
