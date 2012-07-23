@@ -16,9 +16,9 @@ module Radiustar
               'CoA-ACK' => 44,              'CoA-NAK' => 45 }
 
 
-    HDRLEN = 1 + 1 + 2 + 16	# size of packet header
-    P_HDR = "CCna16a*"	# pack template for header
-    P_ATTR = "CCa*"		# pack template for attribute
+    HDRLEN = 1 + 1 + 2 + 16     # size of packet header
+    P_HDR = "CCna16a*"  # pack template for header
+    P_ATTR = "CCa*"             # pack template for attribute
 
     attr_accessor :code
     attr_reader :id, :attributes, :authenticator
@@ -160,29 +160,31 @@ module Radiustar
         if attribute_type == 26 # Vendor Specific Attribute
           vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
           vendor =  @dict.vendors.find_by_id(vid)
-          attribute = vendor.find_attribute_by_id(attribute_type)
+          attribute = vendor.find_attribute_by_id(attribute_type) if vendor
         else
           vendor = nil
           attribute = @dict.find_attribute_by_id(attribute_type)
         end
 
-        attribute_value = case attribute.type
-        when 'string'
-          attribute_value
-        when 'integer'
-          attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
-        when 'ipaddr'
-          attribute_value.unpack("N")[0].to_ip.to_s
-        when 'time'
-          attribute_value.unpack("N")[0]
-        when 'date'
-          attribute_value.unpack("N")[0]
-        end
+        if attribute
+          attribute_value = case attribute.type
+                            when 'string'
+                              attribute_value
+                            when 'integer'
+                              attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
+                            when 'ipaddr'
+                              attribute_value.unpack("N")[0].to_ip.to_s
+                            when 'time'
+                              attribute_value.unpack("N")[0]
+                            when 'date'
+                              attribute_value.unpack("N")[0]
+                            end
 
-        if vendor
-          set_attribute(vendor.name+"/"+attribute.name, attribute_value) if attribute
-        else
-          set_attribute(attribute.name, attribute_value) if attribute
+          if vendor
+            set_attribute(vendor.name+"/"+attribute.name, attribute_value) if attribute
+          else
+            set_attribute(attribute.name, attribute_value) if attribute
+          end
         end
 
         attribute_data[0, length] = ""
@@ -216,8 +218,8 @@ module Radiustar
       decoded_value = ""
       lastround = @authenticator
       0.step(value.length-1, 16) do |i|
-	      decoded_value += xor_str(value[i, 16], Digest::MD5.digest(secret + lastround))
-	      lastround = value[i, 16]
+              decoded_value += xor_str(value[i, 16], Digest::MD5.digest(secret + lastround))
+              lastround = value[i, 16]
       end
 
       decoded_value.gsub!(/\000+/, "") if decoded_value
