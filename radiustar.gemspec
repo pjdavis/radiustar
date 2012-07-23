@@ -2,11 +2,11 @@
 
 Gem::Specification.new do |s|
   s.name = "radiustar"
-  s.version = "0.0.6"
+  s.version = "0.0.7"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["PJ Davis"]
-  s.date = "2012-04-11"
+  s.date = "2012-07-23"
   s.description = "Ruby Radius Library"
   s.email = "pj.davis@gmail.com"
   s.extra_rdoc_files = ["History.txt", "README.rdoc", "templates/default.txt"]

@@ -75,6 +75,7 @@ Thanks to everyone who has contributed to this project. Without your help and su
 * gderosa
 * mkocher
 * bwlang
+* cbascom
 
 == LICENSE:
 

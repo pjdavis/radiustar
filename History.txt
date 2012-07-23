@@ -1,3 +1,6 @@
+== 0.0.7 / 2012-07-23
+* Bugfix by cbascom (https://github.com/pjdavis/radiustar/pull/12)
+
 == 0.0.6 / 2012-04-11
 * Bugfixes by charl(https://github.com/pjdavis/radiustar/issues/8)
 
