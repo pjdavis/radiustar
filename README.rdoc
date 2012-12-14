@@ -22,6 +22,7 @@ Ruby Radius Library
   require 'radiustar'
 
   # Load dictionaries from freeradius directory
+  # NOTICE: here the Dictionary.new() only accept a parameter of "folder name" but not the dictionary file
   dict = Radiustar::Dictionary.new('/usr/share/freeradius/')
 
   # Lets get authenticated
@@ -36,21 +37,21 @@ Ruby Radius Library
 
   if reply[:code] == 'Access-Accept'
     req = Radiustar::Request.new('127.0.0.1:1813', { :dict => dict })
-    
+
     acct_custom_attr = {
       'Framed-Address'  => '127.0.0.1',
       'NAS-Port'        => 0,
       'NAS-Port-Type'   => 'Ethernet',
       'Acct-Session-Time' => 0
     }
-    
+
     timings = Time.now
     reply = req.accounting_start('John Doe', 'testing123', '123456', acct_custom_attr)
-    
+
     sleep(rand 5)
     acct_custom_attr['Acct-Session-Time'] = Time.now - timings
     reply = req.accounting_update('John Doe', 'testing123', '123456', acct_custom_attr)
-    
+
     sleep(rand 5)
     acct_custom_attr['Acct-Session-Time'] = Time.now - timings
     reply = req.accounting_stop('John Doe', 'testing123', '123456', acct_custom_attr)
