@@ -3,10 +3,8 @@
 # the same interface to the radiustar libs.
 #
 class Hash
-  # Implementation of the ruby-1.9.x key function:
-  # http://www.ruby-doc.org/core-1.9.3/Hash.html#method-i-key
-  def key(value)
-    self.index value
+  unless {}.respond_to?(:key)
+    alias_method :key, :index
   end
 end
 
