@@ -5,13 +5,13 @@ module Radiustar
   class Request
 
     def initialize(server, options = {})
+      @host, @port = server.split(":")
+
       @dict = options[:dict].nil? ? Dictionary.default : options[:dict]
       @nas_ip = options[:nas_ip] || get_my_ip(@host)
       @nas_identifier = options[:nas_identifier] || @nas_ip
       @reply_timeout = options[:reply_timeout].nil? ? 60 : options[:reply_timeout].to_i
       @retries_number = options[:retries_number].nil? ? 1 : options[:retries_number].to_i
-
-      @host, @port = server.split(":")
 
       @port = Socket.getservbyname("radius", "udp") unless @port
       @port = 1812 unless @port
