@@ -1,3 +1,6 @@
+== 0.0.8 / 2013-05-23
+* Updated ipaddr_extensions gem
+
 == 0.0.7 / 2012-07-23
 * Bugfix by cbascom (https://github.com/pjdavis/radiustar/pull/12)
 
