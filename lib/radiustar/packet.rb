@@ -192,14 +192,10 @@ module Radiustar
     end
 
     def xor_str(str1, str2)
-      i = 0
-      newstr = ""
-      str1.each_byte do |c1|
-        c2 = str2.bytes.to_a[i]
-        newstr = newstr << (c1 ^ c2)
-        i = i+1
-      end
-      newstr
+      bstr1 = str1.unpack('C*')
+      bstr2 = str2.unpack('C*')
+
+      bstr1.zip(bstr2).map {|b1, b2| b1 ^ b2}.pack('C*')
     end
 
     def encode(value, secret)
