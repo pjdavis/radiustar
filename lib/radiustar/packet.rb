@@ -168,7 +168,7 @@ module Radiustar
 
         if attribute
           attribute_value = case attribute.type
-                            when 'string'
+                            when 'string', "octets"
                               attribute_value
                             when 'integer'
                               attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
@@ -281,7 +281,7 @@ module Radiustar
       def pack_attribute attribute
         anum = attribute.id
         val = case attribute.type
-              when "string"
+              when "string", "octets"
                 @value
               when "integer"
                 raise "Invalid value name '#{@value}'." if attribute.has_values? && attribute.find_values_by_name(@value).nil?
