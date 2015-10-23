@@ -158,7 +158,7 @@ module Radiustar
         attribute_type = attribute_type.to_i
 
         if attribute_type == 26 # Vendor Specific Attribute
-          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
+          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-8}")
           vendor =  @dict.vendors.find_by_id(vid)
           attribute = vendor.find_attribute_by_id(attribute_type) if vendor
         else
