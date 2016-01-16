@@ -45,6 +45,32 @@ module Radiustar
       reply = { :code => @received_packet.code }
       reply.merge @received_packet.attributes
     end
+
+    def authenticate_chap(name, password, secret, user_attributes = {})
+      @packet = Packet.new(@dict, Process.pid & 0xff)
+      @packet.gen_auth_authenticator
+      @packet.code = 'Access-Request'
+      @packet.set_attribute('User-Name', name)
+      @packet.set_attribute('NAS-Identifier', @nas_identifier)
+      @packet.set_attribute('NAS-IP-Address', @nas_ip)
+      @packet.set_chap_password('CHAP-Password', password)
+
+      user_attributes.each_pair do |name, value|
+        @packet.set_attribute(name, value)
+      end
+
+      retries = @retries_number
+      begin
+        send_packet
+        @received_packet = recv_packet(@reply_timeout)
+      rescue Exception => e
+        retry if (retries -= 1) > 0
+        raise
+      end
+
+      reply = { :code => @received_packet.code }
+      reply.merge @received_packet.attributes
+    end
     
     def accounting_request(status_type, name, secret, sessionid, user_attributes = {})
 
