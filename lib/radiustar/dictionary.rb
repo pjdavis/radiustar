@@ -65,7 +65,7 @@ module Radiustar
       file = File.open(path) do |f|
         current_vendor = nil
         f.each_line do |line|
-          next if line =~ /^\#/	# discard comments
+          next if line =~ /^\#/  # discard comments
           split_line = line.split(/\s+/)
           next if split_line == []
           case split_line.first.upcase
@@ -86,7 +86,7 @@ module Radiustar
       file = File.open(path) do |f|
         current_vendor = nil
         f.each_line do |line|
-          next if line =~ /^\#/	# discard comments
+          next if line =~ /^\#/  # discard comments
           split_line = line.split(/\s+/)
           next if split_line == []
           case split_line.first.upcase
@@ -132,9 +132,10 @@ module Radiustar
     end
 
     def set_vendor_value(vendor, line)
-      vendor.find_attribute_by_name(line[1]).add_value(line[2], line[3])
+       if attr = vendor.find_attribute_by_name(line[1])
+        attr.add_value(line[2], line[3])
+      end
     end
-
   end
 
 end
