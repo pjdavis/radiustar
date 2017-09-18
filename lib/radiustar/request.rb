@@ -15,7 +15,7 @@ module Radiustar
 
       @port = Socket.getservbyname("radius", "udp") unless @port
       @port = 1812 unless @port
-      @port = @port.to_i	# just in case
+      @port = @port.to_i  # just in case
       @socket = UDPSocket.open
       @socket.connect(@host, @port)
     end
@@ -97,7 +97,8 @@ module Radiustar
         raise
       end
 
-      return true
+      reply = { :code => @received_packet.code }
+      reply.merge @received_packet.attributes
     end
 
     def coa_request(secret, user_attributes = {})
