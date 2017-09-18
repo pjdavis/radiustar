@@ -167,35 +167,53 @@ module Radiustar
         attribute_type = attribute_type.to_i
 
         if attribute_type == 26 # Vendor Specific Attribute
-          vid, attribute_type, attribute_value = attribute_data.unpack("xxNCxa#{length-6}")
+          vid, vsa_data = attribute_data.unpack("xxNa#{length-6}")
           vendor =  @dict.vendors.find_by_id(vid)
-          attribute = vendor.find_attribute_by_id(attribute_type) if vendor
+
+	  if vendor
+            while vsa_data.length > 0 do
+              attribute_type, attribute_length = vsa_data.unpack("CC")
+              attribute = vendor.find_attribute_by_id(attribute_type)
+
+              vsa_value = vsa_data.unpack("xxa#{attribute_length-2}").first
+
+              if attribute
+                vsa_value = case attribute.type
+                                  when 'string'
+                                    vsa_value
+                                  when 'integer'
+                                    attribute.has_values? ? attribute.find_values_by_id(vsa_value.unpack("N")[0]).name : vsa_value.unpack("N")[0]
+                                  when 'ipaddr'
+                                    vsa_value.unpack("N")[0].to_ip.to_s
+                                  when 'time'
+                                    vsa_value.unpack("N")[0]
+                                  when 'date'
+                                    vsa_value.unpack("N")[0]
+                                  end
+                set_attribute(vendor.name+"/"+attribute.name, vsa_value)
+              end
+              vsa_data[0, attribute_length] = ""
+            end
+	  end
         else
-          vendor = nil
           attribute = @dict.find_attribute_by_id(attribute_type)
-        end
-
-        if attribute
-          attribute_value = case attribute.type
-                            when 'string'
-                              attribute_value
-                            when 'integer'
-                              attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
-                            when 'ipaddr'
-                              attribute_value.unpack("N")[0].to_ip.to_s
-                            when 'time'
-                              attribute_value.unpack("N")[0]
-                            when 'date'
-                              attribute_value.unpack("N")[0]
-                            end
-
-          if vendor
-            set_attribute(vendor.name+"/"+attribute.name, attribute_value) if attribute
-          else
-            set_attribute(attribute.name, attribute_value) if attribute
+          if attribute
+            attribute_value = case attribute.type
+                              when 'string'
+                                attribute_value
+                              when 'integer'
+                                attribute.has_values? ? attribute.find_values_by_id(attribute_value.unpack("N")[0]).name : attribute_value.unpack("N")[0]
+                              when 'ipaddr'
+                                attribute_value.unpack("N")[0].to_ip.to_s
+                              when 'time'
+                                attribute_value.unpack("N")[0]
+                              when 'date'
+                                attribute_value.unpack("N")[0]
+                              end
+  
+            set_attribute(attribute.name, attribute_value)
           end
-        end
-
+ 	end 
         attribute_data[0, length] = ""
       end
     end
