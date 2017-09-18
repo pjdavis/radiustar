@@ -132,6 +132,12 @@ module Radiustar
       @attributes[name] = Attribute.new(@dict, name, encode(value, secret))
     end
 
+    def set_chap_password(name, password)
+      chap_id = rand(256).chr
+      chap_resp = Digest::MD5.digest(chap_id + password + @authenticator)
+      @attributes[name] = Attribute.new(@dict, name, chap_id + chap_resp)
+    end
+
     def decode_attribute(name, secret)
       if @attributes[name]
         decode(@attributes[name].value.to_s, secret)
@@ -290,7 +296,7 @@ module Radiustar
       def pack_attribute attribute
         anum = attribute.id
         val = case attribute.type
-              when "string"
+              when "string", "octets"
                 @value
               when "integer"
                 raise "Invalid value name '#{@value}'." if attribute.has_values? && attribute.find_values_by_name(@value).nil?
